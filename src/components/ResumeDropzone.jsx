@@ -1,49 +1,54 @@
 import { useRef, useState } from "react";
 import { Upload, FileText, AlertTriangle } from "lucide-react";
 
-function readFileAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
-}
-
-export default function ResumeDropzone({ onCandidatesAdded }) {
+export default function ResumeDropzone({ onCandidatesAdded, backendUrl, loading, setLoading, setError }) {
   const inputRef = useRef(null);
   const [warnings, setWarnings] = useState([]);
 
+  const parseViaBackend = async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${backendUrl}/api/parse`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(`Parse failed (${res.status})`);
+    const data = await res.json();
+    return String(data.text || "");
+  };
+
   const handleFiles = async (files) => {
-    const accepted = ["text/plain", "text/markdown"]; // Keep parsing simple client-side
+    setError?.("");
     const newWarnings = [];
     const candidates = [];
+    const supported = [
+      ".pdf",
+      ".docx",
+      ".txt",
+      ".md",
+      ".markdown",
+    ];
 
-    for (const file of files) {
-      if (!accepted.includes(file.type)) {
-        newWarnings.push(`"${file.name}" is ${file.type || "an unsupported type"}. For the live demo, please upload .txt or .md files.`);
-        // We'll still record the candidate with no parsed text
-        candidates.push({
-          id: crypto.randomUUID(),
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          filename: file.name,
-          rawText: "",
-          note: "Unsupported file type; text not parsed in-browser",
-        });
-        continue;
+    setLoading?.(true);
+    try {
+      for (const file of files) {
+        const name = file.name || "resume";
+        const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+        if (!supported.includes(ext)) {
+          newWarnings.push(`"${name}" is an unsupported type for parsing. Try PDF, DOCX, TXT, or MD.`);
+          continue;
+        }
+        try {
+          const text = backendUrl ? await parseViaBackend(file) : "";
+          candidates.push({
+            id: crypto.randomUUID(),
+            name: name.replace(/\.[^/.]+$/, ""),
+            filename: name,
+            rawText: text,
+          });
+        } catch (e) {
+          newWarnings.push(`Failed to parse ${name}.`);
+        }
       }
-      try {
-        const text = await readFileAsText(file);
-        candidates.push({
-          id: crypto.randomUUID(),
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          filename: file.name,
-          rawText: String(text || ""),
-          note: undefined,
-        });
-      } catch (e) {
-        newWarnings.push(`Failed to read ${file.name}.`);
-      }
+    } finally {
+      setLoading?.(false);
     }
 
     setWarnings(newWarnings);
@@ -63,16 +68,17 @@ export default function ResumeDropzone({ onCandidatesAdded }) {
               type="button"
               onClick={() => inputRef.current?.click()}
               className="ml-1 underline decoration-indigo-400 underline-offset-4 hover:text-indigo-600"
+              disabled={loading}
             >
               browse files
             </button>
           </p>
-          <p className="text-xs text-neutral-500">For the demo, use .txt or .md files for best results.</p>
+          <p className="text-xs text-neutral-500">Accepted: PDF, DOCX, TXT, MD</p>
           <input
             ref={inputRef}
             type="file"
             multiple
-            accept=".txt,.md,.markdown"
+            accept=".pdf,.docx,.txt,.md,.markdown"
             onChange={(e) => handleFiles(Array.from(e.target.files || []))}
             className="hidden"
           />

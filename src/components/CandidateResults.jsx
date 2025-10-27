@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Star, Filter, Download } from "lucide-react";
+import { Star, Filter, Download, Save } from "lucide-react";
 
 function toCSV(rows) {
   const headers = [
@@ -24,7 +24,7 @@ function toCSV(rows) {
   return lines;
 }
 
-export default function CandidateResults({ candidates, onExport }) {
+export default function CandidateResults({ candidates, onExport, onSave, canSave, saving }) {
   const [minScore, setMinScore] = useState(0);
 
   const filtered = useMemo(() => {
@@ -72,6 +72,14 @@ export default function CandidateResults({ candidates, onExport }) {
               className="inline-flex items-center gap-2 rounded-lg bg-neutral-900 px-3 py-2 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
             >
               <Download size={16} /> Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!canSave || saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Save size={16} /> {saving ? "Saving..." : "Save to DB"}
             </button>
           </div>
         </div>
